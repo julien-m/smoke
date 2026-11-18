@@ -1,0 +1,27 @@
+name: Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    runs-on: macos-26
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Check formatting
+        run: xcrun swift-format lint --strict -r Sources Tests Package.swift
+      - name: Validate native sources and resources
+        run: |
+          xcrun clang -fsyntax-only -Wall -Wextra -Werror -I Sources/CoalitionReader/include Sources/CoalitionReader/coalition-reader.c
+          plutil -lint info.plist Resources/{en,fr}.lproj/Localizable.strings
+          bash -n build-app.sh
+      - name: Build and test
+        run: swift test --configuration release
