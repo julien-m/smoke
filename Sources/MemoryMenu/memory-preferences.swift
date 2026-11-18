@@ -12,12 +12,11 @@ enum AppLanguage: String, CaseIterable {
   }
 
   func localized(_ key: String, in bundle: Bundle = .main) -> String {
-    if self != .system, let url = bundle.url(forResource: rawValue, withExtension: "lproj"),
+    guard self != .system,
+      let url = bundle.url(forResource: rawValue, withExtension: "lproj"),
       let translation = Bundle(url: url)
-    {
-      return translation.localizedString(forKey: key, value: nil, table: nil)
-    }
-    return bundle.localizedString(forKey: key, value: nil, table: nil)
+    else { return bundle.localizedString(forKey: key, value: nil, table: nil) }
+    return translation.localizedString(forKey: key, value: nil, table: nil)
   }
 }
 
@@ -60,11 +59,23 @@ enum MemoryLevel: Int, Comparable {
 struct AppMemoryThresholds: Equatable {
   static let minimumGB = 1
   static let maximumGB = 256
-  static let initial = Self(warningGB: 2, criticalGB: 4)
+  static let initial = Self(validWarningGB: 2, validCriticalGB: 4)
   private static let bytesPerGB: UInt64 = 1_000_000_000
 
   let warningGB: Int
   let criticalGB: Int
+
+  init?(warningGB: Int, criticalGB: Int) {
+    guard warningGB >= Self.minimumGB, warningGB < criticalGB, criticalGB <= Self.maximumGB else {
+      return nil
+    }
+    self.init(validWarningGB: warningGB, validCriticalGB: criticalGB)
+  }
+
+  private init(validWarningGB: Int, validCriticalGB: Int) {
+    warningGB = validWarningGB
+    criticalGB = validCriticalGB
+  }
 
   func level(bytes: UInt64?) -> MemoryLevel {
     guard let bytes else { return .normal }
@@ -106,26 +117,19 @@ final class MemoryPreferences: ObservableObject {
         warning: defaults.integer(forKey: Key.systemWarning),
         critical: defaults.integer(forKey: Key.systemCritical)
       ) ?? .initial
-    let warning = defaults.object(forKey: Key.warningGB) as? Int
-    let critical = defaults.object(forKey: Key.criticalGB) as? Int
-    if let warning, let critical,
-      warning >= AppMemoryThresholds.minimumGB, critical <= AppMemoryThresholds.maximumGB,
-      warning < critical
-    {
-      thresholds = AppMemoryThresholds(warningGB: warning, criticalGB: critical)
-    } else {
-      thresholds = .initial
-    }
+    thresholds =
+      AppMemoryThresholds(
+        warningGB: defaults.object(forKey: Key.warningGB) as? Int ?? 0,
+        criticalGB: defaults.object(forKey: Key.criticalGB) as? Int ?? 0
+      ) ?? .initial
   }
 
   func setWarning(_ value: Int) {
-    guard (AppMemoryThresholds.minimumGB..<thresholds.criticalGB).contains(value) else { return }
-    save(AppMemoryThresholds(warningGB: value, criticalGB: thresholds.criticalGB))
+    setAppThresholds(warning: value, critical: thresholds.criticalGB)
   }
 
   func setCritical(_ value: Int) {
-    guard value > thresholds.warningGB, value <= AppMemoryThresholds.maximumGB else { return }
-    save(AppMemoryThresholds(warningGB: thresholds.warningGB, criticalGB: value))
+    setAppThresholds(warning: thresholds.warningGB, critical: value)
   }
 
   func setSystemWarning(_ value: Int) {
@@ -143,7 +147,8 @@ final class MemoryPreferences: ObservableObject {
     defaults.set(value.critical, forKey: Key.systemCritical)
   }
 
-  private func save(_ value: AppMemoryThresholds) {
+  private func setAppThresholds(warning: Int, critical: Int) {
+    guard let value = AppMemoryThresholds(warningGB: warning, criticalGB: critical) else { return }
     thresholds = value
     defaults.set(value.warningGB, forKey: Key.warningGB)
     defaults.set(value.criticalGB, forKey: Key.criticalGB)

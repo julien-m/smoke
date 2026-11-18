@@ -1,0 +1,3 @@
+# Match swift-format for multiline collection literals.
+trailing_comma:
+  mandatory_comma: true

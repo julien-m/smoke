@@ -47,3 +47,7 @@
 "settings.system-critical-available %@" = "Rouge à %@ ou moins";
 "settings.pressure-note" = "La pression mémoire de macOS peut aussi changer la couleur de l’icône.";
 "status.summary" = "Smoke · RAM estimée : %@ utilisée, %@ disponible";
+"sort.by-name" = "Trier par nom";
+"sort.by-memory" = "Trier par mémoire";
+"sort.current-memory" = "Tri par mémoire décroissante";
+"sort.current-name" = "Tri alphabétique";

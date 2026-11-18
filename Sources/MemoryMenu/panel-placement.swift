@@ -11,7 +11,7 @@ enum PanelPlacement {
     let height = min(preferredSize.height, top - visibleFrame.minY)
     guard width > 0, height > 0 else { return nil }
     let centeredX = anchor.midX - width / 2
-    let x = min(max(centeredX, visibleFrame.minX), visibleFrame.maxX - width)
-    return CGRect(x: x, y: top - height, width: width, height: height)
+    let left = min(max(centeredX, visibleFrame.minX), visibleFrame.maxX - width)
+    return CGRect(x: left, y: top - height, width: width, height: height)
   }
 }

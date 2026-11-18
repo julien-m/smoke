@@ -18,7 +18,11 @@ import Testing
   let domain = "SmokeTests.\(UUID().uuidString)"
   let defaults = try #require(UserDefaults(suiteName: domain))
   defer { defaults.removePersistentDomain(forName: domain) }
+  // Values stored under the legacy keys must remain integers.
+  defaults.set("7", forKey: "app-warning-gb")
+  defaults.set("9", forKey: "app-critical-gb")
   let preferences = MemoryPreferences(defaults: defaults)
+  #expect(preferences.thresholds == .initial)
   #expect(preferences.language == .system)
   preferences.language = .french
   let defaultsThresholds = preferences.systemThresholds
@@ -43,4 +47,20 @@ import Testing
   let sample = await sampler.sample(applications: [pid], expanded: pid)
   #expect(sample.applications.isEmpty)
   #expect(sample.processes == nil)
+}
+
+@Test func appOrderSwitchesBetweenMemoryAndLocalizedNames() {
+  let noReading = AppSortKey(name: "A", bytes: nil, pid: 1)
+  let highest = AppSortKey(name: "Z", bytes: 300, pid: 2)
+  let equalReadingLowerPID = AppSortKey(name: "A", bytes: 200, pid: 3)
+  let equalReadingHigherPID = AppSortKey(name: "A", bytes: 200, pid: 4)
+  let rows = [equalReadingHigherPID, highest, noReading, equalReadingLowerPID]
+  let memory = AppSortOrder.memory
+  #expect(
+    rows.sorted(by: memory.precedes).map(\.pid)
+      == [highest, equalReadingLowerPID, equalReadingHigherPID, noReading].map(\.pid))
+  #expect(
+    rows.sorted(by: memory.alternate.precedes).map(\.pid)
+      == [noReading, equalReadingLowerPID, equalReadingHigherPID, highest].map(\.pid))
+  #expect(memory.alternate.alternate == .memory)
 }

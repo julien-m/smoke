@@ -1,6 +1,6 @@
 # Smoke
 
-A native macOS menu bar app built with SwiftUI and AppKit. It lists open graphical apps by memory footprint. Expand an app to see the processes observed in its resource coalition, including each PID and individual footprint.
+A native macOS menu bar app built with SwiftUI and AppKit. It lists open graphical apps by descending memory footprint. The sort icon switches between memory and alphabetical order. Expand an app to see the processes observed in its resource coalition, including each PID and individual footprint.
 
 On hover, Quit, Force Quit, and Restart take the place of the memory value. They are also available from the context menu. Restart waits for the selected instance to exit before reopening the app. Force Quit asks for confirmation.
 

@@ -16,12 +16,14 @@ struct SystemThresholdSettings: View {
       ) {
         thresholdLabel(critical: false, value: displayed(thresholds.warning))
       }
+      .accessibilityIdentifier("settings-system-warning-stepper")
       Stepper(
         value: binding(used: thresholds.critical, set: { preferences.setSystemCritical($0) }),
         in: displayedRange((thresholds.warning + 1)...SystemMemoryThresholds.percentMaximum)
       ) {
         thresholdLabel(critical: true, value: displayed(thresholds.critical))
       }
+      .accessibilityIdentifier("settings-system-critical-stepper")
       if preferences.display == .icon {
         Text("settings.pressure-note").font(.caption).foregroundStyle(.secondary)
       }

@@ -90,9 +90,13 @@ actor MemorySampler {
     var current: UInt64 = 0
     // Recheck membership after reading the process in case it exited or its PID was reused.
     guard mm_resource_coalition(pid, &current), current == coalition else { return nil }
-    let executable = String(
-      decoding: path.prefix(while: { $0 != 0 }).map(UInt8.init(bitPattern:)), as: UTF8.self)
-    let name = count > 0 ? URL(fileURLWithPath: executable).lastPathComponent : String(pid)
+    guard count > 0 else {
+      return ProcessMemory(id: pid, name: String(pid), bytes: footprint)
+    }
+    let pathBytes = path.prefix(while: { $0 != 0 }).map(UInt8.init(bitPattern:))
+    // POSIX paths may contain invalid UTF-8; keep the readable portion of the executable name.
+    let executable = String(decoding: pathBytes, as: Unicode.UTF8.self)
+    let name = URL(fileURLWithPath: executable).lastPathComponent
     return ProcessMemory(id: pid, name: name, bytes: footprint)
   }
 }

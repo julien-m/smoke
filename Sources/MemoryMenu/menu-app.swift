@@ -49,6 +49,7 @@ final class MenuDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     self.item = item
     item.button?.imagePosition = .imageOnly
+    item.button?.setAccessibilityIdentifier("smoke-status-btn")
     item.button?.target = self
     item.button?.action = #selector(togglePanel)
     startSystemIndicator()

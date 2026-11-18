@@ -4,10 +4,11 @@ import Combine
 
 struct AppRow: Identifiable {
   let app: NSRunningApplication
-  let bytes: UInt64?
+  let sortKey: AppSortKey
 
   var id: NSRunningApplication { app }
-  var name: String { app.localizedName ?? app.bundleIdentifier ?? String(app.processIdentifier) }
+  var name: String { sortKey.name }
+  var bytes: UInt64? { sortKey.bytes }
 }
 
 struct ActionRequest {
@@ -19,6 +20,7 @@ struct ActionRequest {
 @MainActor
 final class PanelModel: ObservableObject {
   @Published private(set) var apps: [AppRow] = []
+  @Published private(set) var sortOrder: AppSortOrder = .memory
   @Published private(set) var processes: [ProcessMemory]?
   @Published private(set) var isLoadingProcesses = false
   @Published private(set) var expanded: NSRunningApplication?
@@ -74,8 +76,7 @@ final class PanelModel: ObservableObject {
   }
 
   private func startSampling() {
-    applicationObservation = workspace.observe(\.runningApplications, options: [.new]) {
-      [weak self] _, _ in
+    applicationObservation = workspace.observe(\.runningApplications) { [weak self] _, _ in
       Task { @MainActor in self?.queueWorkspaceUpdate() }
     }
     let timer = Timer(timeInterval: Self.refreshInterval, repeats: true) { [weak self] _ in
@@ -119,6 +120,12 @@ final class PanelModel: ObservableObject {
       self.publish(sample, for: running)
       self.sampling = nil
     }
+  }
+
+  func toggleSortOrder() {
+    let order = sortOrder.alternate
+    sortOrder = order
+    apps.sort { order.precedes($0.sortKey, $1.sortKey) }
   }
 
   func toggleDetails(for app: NSRunningApplication) {
@@ -174,16 +181,13 @@ final class PanelModel: ObservableObject {
   }
 
   private func publish(_ sample: MemorySample, for running: [NSRunningApplication]) {
-    apps = running.filter { !$0.isTerminated }.map {
-      AppRow(app: $0, bytes: sample.applications[$0.processIdentifier]?.bytes)
-    }.sorted {
-      switch ($0.bytes, $1.bytes) {
-      case (let lhs?, let rhs?) where lhs != rhs: lhs > rhs
-      case (_?, nil): true
-      case (nil, _?): false
-      default: $0.name.localizedStandardCompare($1.name) == .orderedAscending
-      }
-    }
+    let order = sortOrder
+    apps = running.filter { !$0.isTerminated }.map { app in
+      let pid = app.processIdentifier
+      let name = app.localizedName ?? app.bundleIdentifier ?? String(pid)
+      let key = AppSortKey(name: name, bytes: sample.applications[pid]?.bytes, pid: pid)
+      return AppRow(app: app, sortKey: key)
+    }.sorted { order.precedes($0.sortKey, $1.sortKey) }
     processes = sample.processes
     isLoadingProcesses = false
     sampledAt = .now

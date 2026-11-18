@@ -23,7 +23,7 @@ struct PanelView: View {
       Divider()
       notice
       if model.showsSettings {
-        settings
+        PanelSettingsView(preferences: preferences, login: login, inset: PanelLayout.inset)
       } else if model.apps.isEmpty {
         emptyState
       } else {
@@ -43,6 +43,7 @@ struct PanelView: View {
         .lineLimit(1)
       Spacer(minLength: 8)
       if !model.showsSettings {
+        sortButton
         Button {
           model.refresh(replacePending: true)
         } label: {
@@ -52,6 +53,7 @@ struct PanelView: View {
         }
         .buttonStyle(.borderless)
         .help(Text("panel.refresh"))
+        .accessibilityIdentifier("panel-refresh-btn")
       }
       Button {
         model.toggleSettings()
@@ -66,21 +68,42 @@ struct PanelView: View {
       }
       .buttonStyle(.borderless)
       .help(Text(model.showsSettings ? "settings.back" : "settings.title"))
+      .accessibilityIdentifier("panel-settings-btn")
     }
     .padding(.horizontal, PanelLayout.inset)
     .padding(.vertical, 4)
+  }
+
+  private var sortButton: some View {
+    let isMemoryOrder = model.sortOrder == .memory
+    let action: LocalizedStringKey = isMemoryOrder ? "sort.by-name" : "sort.by-memory"
+    let current: LocalizedStringKey = isMemoryOrder ? "sort.current-memory" : "sort.current-name"
+    return Button(
+      action, systemImage: isMemoryOrder ? "line.3.horizontal.decrease" : "textformat.abc"
+    ) {
+      model.toggleSortOrder()
+    }
+    .labelStyle(.iconOnly)
+    .frame(width: PanelLayout.actionSize, height: PanelLayout.actionSize)
+    .buttonStyle(.borderless)
+    .help(Text(action))
+    .accessibilityValue(Text(current))
+    .accessibilityIdentifier("panel-sort-btn")
   }
 
   @ViewBuilder private var notice: some View {
     if let confirmation = model.confirmation {
       VStack(alignment: .leading, spacing: 8) {
         Text("action.confirm \(confirmation.name)").font(.callout.weight(.semibold))
+          .accessibilityIdentifier("action-confirm-label")
         Text("action.unsaved").font(.caption).foregroundStyle(.secondary)
         HStack(spacing: 8) {
           Spacer()
           Button("action.cancel") { model.confirmation = nil }
+            .accessibilityIdentifier("action-cancel-btn")
           Button("action.force", role: .destructive) { model.perform(confirmation) }
             .tint(.red)
+            .accessibilityIdentifier("action-force-confirm-btn")
         }
         .buttonStyle(.bordered)
       }
@@ -90,8 +113,10 @@ struct PanelView: View {
       HStack(spacing: 8) {
         Image(systemName: "exclamationmark.circle").foregroundStyle(.orange)
         Text(error.message).font(.caption)
+          .accessibilityIdentifier("action-error-label")
         Spacer()
         Button("action.dismiss", systemImage: "xmark", action: model.dismissError)
+          .accessibilityIdentifier("action-dismiss-btn")
           .labelStyle(.iconOnly)
           .buttonStyle(.borderless)
       }
@@ -100,82 +125,14 @@ struct PanelView: View {
     }
   }
 
-  private var settings: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 12) {
-        Picker("settings.language", selection: $preferences.language) {
-          Text("language.system").tag(AppLanguage.system)
-          Text(verbatim: "English").tag(AppLanguage.english)
-          Text(verbatim: "Français").tag(AppLanguage.french)
-        }
-        .pickerStyle(.menu)
-        Picker("settings.status-display", selection: $preferences.display) {
-          Text("display.icon").tag(MemoryDisplay.icon)
-          Text("display.used").tag(MemoryDisplay.used)
-          Text("display.available").tag(MemoryDisplay.available)
-        }
-        .pickerStyle(.menu)
-        SystemThresholdSettings(preferences: preferences)
-        Divider()
-        appThresholdSettings
-        Divider()
-        Toggle(
-          "settings.launch-at-login",
-          isOn: Binding(
-            get: { login.isRegistered },
-            set: { value in login.setRegistered(value) }
-          )
-        )
-        .toggleStyle(.switch)
-        if login.status == .requiresApproval {
-          Text("settings.approval").font(.caption).foregroundStyle(.secondary)
-          Button("settings.system") { login.openSystemSettings() }
-        }
-        if login.didFail {
-          Text("settings.failed").font(.caption).foregroundStyle(.secondary)
-        }
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(PanelLayout.inset)
-    }
-  }
-
-  private var appThresholdSettings: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Text("settings.app-thresholds").font(.callout.weight(.semibold))
-      Stepper(
-        value: Binding(
-          get: { preferences.thresholds.warningGB }, set: { value in preferences.setWarning(value) }
-        ),
-        in: AppMemoryThresholds.minimumGB...(preferences.thresholds.criticalGB - 1)
-      ) {
-        Label {
-          Text("settings.warning \(preferences.thresholds.warningGB)")
-        } icon: {
-          Image(systemName: "circle.fill").foregroundStyle(.orange)
-        }
-      }
-      Stepper(
-        value: Binding(
-          get: { preferences.thresholds.criticalGB },
-          set: { value in preferences.setCritical(value) }),
-        in: (preferences.thresholds.warningGB + 1)...AppMemoryThresholds.maximumGB
-      ) {
-        Label {
-          Text("settings.critical \(preferences.thresholds.criticalGB)")
-        } icon: {
-          Image(systemName: "circle.fill").foregroundStyle(.red)
-        }
-      }
-    }
-  }
-
   private var emptyState: some View {
     Group {
       if model.sampledAt == nil {
         ProgressView().controlSize(.small)
+          .accessibilityIdentifier("panel-sampling-progress")
       } else {
         Text("panel.empty").foregroundStyle(.secondary)
+          .accessibilityIdentifier("panel-empty-label")
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -205,8 +162,10 @@ struct PanelView: View {
     LazyVStack(alignment: .leading, spacing: 4) {
       if model.isLoadingProcesses {
         Text("process.loading").font(.caption).foregroundStyle(.secondary)
+          .accessibilityIdentifier("process-loading-label")
       } else if let processes, !processes.isEmpty {
         Text("process.count \(processes.count)")
+          .accessibilityIdentifier("process-count-label")
           .font(.caption.weight(.semibold))
           .foregroundStyle(.secondary)
         ForEach(processes) { process in
@@ -224,6 +183,7 @@ struct PanelView: View {
         }
       } else {
         Text("process.unavailable").font(.caption).foregroundStyle(.secondary)
+          .accessibilityIdentifier("process-unavailable-label")
       }
     }
     .padding(12)
@@ -241,6 +201,7 @@ struct PanelView: View {
       }
       Spacer()
       Button("panel.quit", action: quitPanel)
+        .accessibilityIdentifier("panel-quit-btn")
         .buttonStyle(.borderless)
         .disabled(model.busyApp != nil)
     }
@@ -294,6 +255,7 @@ private struct AppRowView: View {
       }
       .buttonStyle(.plain)
       .accessibilityHint(Text(isExpanded ? "process.collapse" : "process.expand"))
+      .accessibilityIdentifier("app-details-btn-\(row.sortKey.pid)")
       trailingContent
         .frame(width: PanelLayout.trailingWidth, alignment: .trailing)
     }
@@ -306,9 +268,15 @@ private struct AppRowView: View {
     .contentShape(Rectangle())
     .onHover { hovered = $0 }
     .contextMenu {
-      Button("action.quit") { action(.quit) }.disabled(!canAct)
-      Button("action.force", role: .destructive) { action(.forceQuit) }.disabled(!canAct)
-      Button("action.restart") { action(.restart) }.disabled(!canAct || row.app.bundleURL == nil)
+      Button("action.quit") { action(.quit) }
+        .accessibilityIdentifier("app-menu-quit-btn")
+        .disabled(!canAct)
+      Button("action.force", role: .destructive) { action(.forceQuit) }
+        .accessibilityIdentifier("app-menu-force-btn")
+        .disabled(!canAct)
+      Button("action.restart") { action(.restart) }
+        .accessibilityIdentifier("app-menu-restart-btn")
+        .disabled(!canAct || row.app.bundleURL == nil)
     }
     .accessibilityAction(named: Text("action.quit")) { if canAct { action(.quit) } }
     .accessibilityAction(named: Text("action.force")) { if canAct { action(.forceQuit) } }
@@ -320,6 +288,7 @@ private struct AppRowView: View {
   @ViewBuilder private var trailingContent: some View {
     if isBusy {
       ProgressView().controlSize(.small)
+        .accessibilityIdentifier("app-action-progress-\(row.sortKey.pid)")
     } else if hovered {
       HStack(spacing: PanelLayout.actionGap) {
         actionButton(.quit, title: "action.quit", icon: "rectangle.portrait.and.arrow.right")
@@ -347,6 +316,7 @@ private struct AppRowView: View {
     }
     .buttonStyle(.borderless)
     .help(Text(title))
+    .accessibilityIdentifier("app-\(kind.identifier)-btn-\(row.sortKey.pid)")
   }
 }
 
@@ -373,6 +343,16 @@ extension AppActionError {
     case .requestRejected: "error.request-rejected"
     case .terminationTimeout: "error.timeout"
     case .launchFailed: "error.launch"
+    }
+  }
+}
+
+extension AppAction {
+  fileprivate var identifier: String {
+    switch self {
+    case .quit: "quit"
+    case .forceQuit: "force"
+    case .restart: "restart"
     }
   }
 }
